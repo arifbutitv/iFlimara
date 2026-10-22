@@ -1,0 +1,46 @@
+name: Build and publish Cloudstream plugin
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: cloudstream-build
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Build
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon IFilmArabic:make makePluginsJson
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IFilmArabic
+          path: |
+            IFilmArabic/build/*.cs3
+            build/plugins.json
+      - name: Publish builds branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/publish"
+          cp IFilmArabic/build/*.cs3 build/plugins.json repo.json "$RUNNER_TEMP/publish/"
+          cd "$RUNNER_TEMP/publish"
+          git init -b builds
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .
+          git commit -m "Build $GITHUB_SHA"
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c http.extraheader="AUTHORIZATION: basic $AUTH" push --force origin builds
