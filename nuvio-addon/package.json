@@ -1,0 +1,18 @@
+{
+  "name": "ifilm-nuvio-addon",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Arabic iFilm catalog, search, metadata and streams for Nuvio/Stremio",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "test:live": "node scripts/smoke.js"
+  },
+  "dependencies": {
+    "cheerio": "1.2.0",
+    "express": "4.22.3"
+  }
+}

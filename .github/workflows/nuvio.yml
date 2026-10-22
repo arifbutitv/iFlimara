@@ -1,0 +1,21 @@
+name: Test Nuvio addon
+on:
+  push:
+    branches: [main]
+    paths: ['nuvio-addon/**', '.github/workflows/nuvio.yml']
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nuvio-addon
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: nuvio-addon/package-lock.json
+      - run: npm ci
+      - run: npm test
