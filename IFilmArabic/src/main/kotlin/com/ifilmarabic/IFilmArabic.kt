@@ -129,8 +129,21 @@ class IFilmArabic : MainAPI() {
     }
 
     override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
-        val host = runCatching { java.net.URI(data).host?.lowercase() }.getOrNull() ?: return false
+        val uri = runCatching { java.net.URI(data) }.getOrNull() ?: return false
+        val host = uri.host?.lowercase() ?: return false
         if (!(host == "ifilmtv.ir" || host.endsWith(".ifilmtv.ir") || host == "preview.presstv.co.uk")) return false
+        // Film pages embed fa.ifilmtv.ir URLs which return 403. The same public
+        // media files are served by the network's preview CDN over HTTPS.
+        // Resolve here as well as at load time so previously saved films work.
+        val path = uri.rawPath.orEmpty().trimStart('/')
+        val uploadPath = path.removePrefix("ifilm/")
+        if (host.endsWith(".ifilmtv.ir") && uploadPath.startsWith("UploadedFiles/Video/", true)) {
+            val media = "https://preview.presstv.co.uk/ifilm/$uploadPath"
+            callback(newExtractorLink(name, "$name - MP4", media, ExtractorLinkType.VIDEO) {
+                referer = "$mainUrl/"
+            })
+            return true
+        }
         callback(newExtractorLink(name, name, data,
             if (data.contains(".m3u8", true)) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
         ) { referer = "$mainUrl/" })
