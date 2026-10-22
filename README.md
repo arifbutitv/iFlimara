@@ -1,10 +1,11 @@
 # iFlimara — آي فيلم العربية
 
-يتضمن المستودع أيضاً [إضافة Nuvio](nuvio-addon/README.md) للكتالوج والبحث والتشغيل، مع إعداد نشر Render. تحتاج إضافة Nuvio استضافة ويب منفصلة عن ملفات Cloudstream.
+مشروع لتصفح أفلام ومسلسلات [موقع آي فيلم العربي الرسمي](https://ar.ifilmtv.ir/)، والبحث عنها وتشغيل الفيديو المتاح فيه. يتكون من:
 
-إضافة Cloudstream لتصفح أفلام ومسلسلات [موقع آي فيلم العربي](https://ar.ifilmtv.ir/)، والبحث وتشغيل الفيديو المتاح فيه.
+- **مستودع Cloudstream** لتثبيت إضافة **IFilmArabic**.
+- **إضافة Nuvio** لعرض كتالوج الأفلام والمسلسلات والبحث والتفاصيل والحلقات ومصادر التشغيل، عبر خدمة ويب ببروتوكول Stremio.
 
-## التثبيت
+## تثبيت إضافة Cloudstream
 
 في Cloudstream افتح **الإعدادات ← الإضافات ← إضافة مستودع** والصق:
 
@@ -12,7 +13,23 @@
 https://raw.githubusercontent.com/arifbutitv/iFlimara/main/repo.json
 ```
 
-ثم نزّل **IFilmArabic** واختر **آي فيلم العربية** من المصادر. انتظر نجاح [عملية البناء](https://github.com/arifbutitv/iFlimara/actions) قبل تثبيت الإضافة لأول مرة.
+ثم نزّل **IFilmArabic** واختر **آي فيلم العربية** من المصادر.
+
+## تثبيت إضافة Nuvio
+
+1. افتح **Nuvio** وانتقل إلى **الإعدادات ← Addons ← Add Addon**.
+2. الصق رابط الإضافة التالي:
+
+```text
+https://ifilmar-nuvio.onrender.com/manifest.json
+```
+
+3. ثبّت **آي فيلم العربية | iFlimara**.
+4. تصفح قسمي **آي فيلم — المسلسلات** و**آي فيلم — الأفلام**، أو استخدم البحث. افتح العنوان، ثم اختر الحلقة إن كان مسلسلاً، واختر مصدر التشغيل المتاح.
+
+تدعم الإضافة HLS وMP4 بحسب ما يوفره المصدر. الخدمة مستضافة على Render؛ إذا كانت متوقفة بسبب الخمول فقد يتأخر أول طلب، فانتظر قليلًا ثم أعد المحاولة.
+
+رابط Nuvio أعلاه يختلف عن رابط مستودع Cloudstream. للتشغيل على خادم خاص أو الاطلاع على إعدادات النشر، راجع [دليل إضافة Nuvio](nuvio-addon/README.md).
 
 ## المزايا والحدود
 
@@ -23,7 +40,7 @@ https://raw.githubusercontent.com/arifbutitv/iFlimara/main/repo.json
 - الإصدار 2 يصلح روابط ملفات الأفلام التي تعيد 403 على نطاق الموقع، باستخدام نسخة الملف على خادم `preview.presstv.co.uk` التابع للشبكة. يشمل التصحيح روابط الأفلام المحفوظة سابقاً.
 - توفر الفيديو وجودته يعتمدان على الموقع والمنطقة الجغرافية. لا تتجاوز الإضافة قيود الوصول.
 
-## التطوير
+## تطوير إضافة Cloudstream
 
 يتطلب البناء JDK 17 وAndroid SDK 35:
 
@@ -33,4 +50,17 @@ https://raw.githubusercontent.com/arifbutitv/iFlimara/main/repo.json
 
 يُنتج الملف `IFilmArabic/build/IFilmArabic.cs3`. عند تحديث الكود، ارفع `version` في `IFilmArabic/build.gradle.kts`. ينشر GitHub Actions الملفات و`plugins.json` تلقائياً في فرع `builds`.
 
-المشروع مبني على [قالب Cloudstream الرسمي](https://github.com/recloudstream/TestPlugins). مشروع مستقل غير تابع لقناة آي فيلم أو Cloudstream؛ حقوق المحتوى لأصحابه.
+## تطوير إضافة Nuvio
+
+الكود موجود في مجلد [`nuvio-addon`](nuvio-addon)، ويتطلب Node.js 22 أو أحدث:
+
+```sh
+cd nuvio-addon
+npm ci
+npm test
+npm start
+```
+
+رابط التثبيت المحلي: `http://localhost:7000/manifest.json`. يتضمن المشروع ملف `render.yaml` للنشر على Render وملف Docker داخل مجلد الإضافة. راجع [دليل التطوير والنشر](nuvio-addon/README.md) للتفاصيل.
+
+جزء Cloudstream مبني على [قالب Cloudstream الرسمي](https://github.com/recloudstream/TestPlugins). المشروع مستقل وغير تابع لقناة آي فيلم أو Cloudstream أو Nuvio؛ حقوق المحتوى لأصحابه.
