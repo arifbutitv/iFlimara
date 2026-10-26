@@ -1,7 +1,7 @@
 name: Update ShiaTube content
 on:
-  schedule:
-    - cron: '23 */6 * * *'
+  # ShiaTube rejects GitHub-hosted runners (HTTP 403).
+  # Automatic updates run on the owner's Windows computer instead.
   workflow_dispatch:
 permissions:
   contents: write

@@ -6,3 +6,5 @@ local.properties
 node_modules/
 *.log
 .shiatube-checkpoint.json
+.local-update.lock
+.local-update-deps.sha256

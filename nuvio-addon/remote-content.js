@@ -23,15 +23,15 @@ function validateContent(snapshot, sources, state) {
   return { snapshot, sources, state };
 }
 async function readRemoteContent(revision, get = fetch) {
-  async function json(file) {
-    const r = await get(ROOT + file, { signal: AbortSignal.timeout(12000), headers: { Accept: 'application/json' } });
+  async function json(file, version) {
+    const r = await get(ROOT + file + `?v=${encodeURIComponent(version)}`, { signal: AbortSignal.timeout(12000), headers: { Accept: 'application/json' } });
     if (!r.ok) throw new Error(`Content index HTTP ${r.status}`);
     if (Number(r.headers.get('content-length')) > 40000000) throw new Error('Content index too large');
     return r.json();
   }
-  const state = await json('shiatube-state.json');
+  const state = await json('shiatube-state.json', Math.floor(Date.now() / 600000));
   if (state.revision === revision) return null;
-  const [snapshot, sources] = await Promise.all([json('shiatube.json'), json('shiatube-sources.json')]);
+  const [snapshot, sources] = await Promise.all([json('shiatube.json', state.revision), json('shiatube-sources.json', state.revision)]);
   return validateContent(snapshot, sources, state);
 }
 module.exports = { readRemoteContent, validateContent };
