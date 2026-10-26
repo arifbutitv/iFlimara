@@ -1,0 +1,11 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const folder = path.join(__dirname, '../data');
+const snapshot = JSON.parse(fs.readFileSync(path.join(folder, 'shiatube.json')));
+const sources = JSON.parse(fs.readFileSync(path.join(folder, 'shiatube-sources.json')));
+const revision = crypto.createHash('sha256').update(JSON.stringify(snapshot) + '\n' + JSON.stringify(sources)).digest('hex');
+const file = path.join(folder, 'shiatube-state.json');
+const previous = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : {};
+if (previous.revision !== revision) fs.writeFileSync(file, JSON.stringify({ revision, updated: new Date().toISOString(), series: snapshot.series.length, movies: snapshot.movies.length }));
+console.log(`Content revision: ${revision}`);

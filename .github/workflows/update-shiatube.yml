@@ -1,0 +1,45 @@
+name: Update ShiaTube content
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: shiatube-content-update
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: nuvio-addon
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: nuvio-addon/package-lock.json
+      - run: npm ci
+      - name: Read new channel videos
+        run: node scripts/update-shiatube.js
+      - name: Index playable source references
+        run: node scripts/index-shiatube-sources.js
+      - name: Validate and prepare content revision
+        run: |
+          node scripts/write-shiatube-state.js
+          npm test
+      - name: Publish only changed content
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/shiatube.json data/shiatube-sources.json data/shiatube-state.json
+          if git diff --cached --quiet; then
+            echo 'No content changes to publish'
+          else
+            git commit -m 'Update ShiaTube content index'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi

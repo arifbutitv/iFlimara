@@ -2,7 +2,7 @@
 const { createProvider } = require('./provider');
 const { createShiaProvider } = require('./shiatube');
 const manifest = {
-  id: 'community.arifbutitv.ifilmar', version: '1.1.1', name: 'آي فيلم العربية',
+  id: 'community.arifbutitv.ifilmar', version: '1.2.0', name: 'آي فيلم العربية',
   description: 'أربع قوائم للأفلام والمسلسلات من آي فيلم وShiaTube، مع البحث والحلقات ومصادر التشغيل.',
   resources: ['catalog', { name: 'meta', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:'] }, { name: 'stream', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:'] }],
   types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:'],

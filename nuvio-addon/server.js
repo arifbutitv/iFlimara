@@ -16,7 +16,7 @@ app.use((req, res, next) => {
   next();
 });
 app.get('/', (_req, res) => res.type('html').send('<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>آي فيلم — Nuvio</title><body style="font:20px system-ui;max-width:700px;margin:60px auto;padding:24px"><h1>آي فيلم العربية</h1><p>إضافة Nuvio للأفلام والمسلسلات والبحث.</p><p>انسخ رابط <a href="manifest.json">manifest.json</a> من هذا الخادم والصقه في Nuvio ← الإعدادات ← الإضافات ← إضافة Addon.</p><p>المحتوى المتاح يعتمد على الموقع الرسمي؛ بعض الأفلام تحتوي إعلاناً فقط.</p></body></html>'));
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', content: addon.shia.contentState() }));
 // OK.ru signs media URLs for the resolver's IP. Forward only known indexed
 // videos, with Range support; never accept a user-supplied remote URL.
 app.get(/^\/shiatube\/play\/([A-Za-z0-9]{10,40})\.mp4$/, async (req, res) => {

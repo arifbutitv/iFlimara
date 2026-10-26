@@ -2,6 +2,8 @@
 const cheerio = require('cheerio');
 const crypto = require('node:crypto');
 const savedSources = require('./data/shiatube-sources.json');
+const { readRemoteContent } = require('./remote-content');
+const initialState = require('./data/shiatube-state.json');
 const BASE = 'https://shiatube.org';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36';
 const HEADERS = { 'User-Agent': UA, Accept: 'text/html', 'Accept-Language': 'ar' };
@@ -54,6 +56,34 @@ async function syncChannel(channel, onPage = () => {}, existing = []) {
   }
   throw new Error('Channel pagination did not reach its end');
 }
+function mergeNewVideos(existing, incoming) {
+  const known = new Set(existing.map(v => v.id));
+  const added = incoming.filter(v => !known.has(v.id));
+  return added.length ? [...added, ...existing] : existing;
+}
+async function syncRecentChannel(channel, existing) {
+  const page = await channelPage(channel), known = new Set(existing.map(v => v.id));
+  const incoming = new Map(page.videos.map(v => [v.id, v]));
+  let batch = page.videos;
+  for (let n = 0; batch.length && !batch.some(v => known.has(v.id)); n++) {
+    if (n >= 200) throw new Error('Recent channel pagination limit reached');
+    const last = batch.at(-1);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    const r = await fetch(`${BASE}/aj/load-more/profile_videos?views=${encodeURIComponent(last.views)}`, {
+      method: 'POST', body: new URLSearchParams({ hash: page.hash, user_id: page.user, last_id: last.cursor }),
+      headers: { ...HEADERS, Cookie: page.cookie, Referer: `${BASE}/@${channel}`, 'X-Requested-With': 'XMLHttpRequest' }, signal: AbortSignal.timeout(20000),
+    });
+    if (!r.ok) throw new Error(`Recent channel HTTP ${r.status}`);
+    const data = await r.json();
+    if (Array.isArray(data) && !data.length) break;
+    if (data.status !== 200) throw new Error('Invalid recent channel response');
+    batch = parseVideos(data.videos || data.html || '', channel);
+    let added = 0;
+    for (const video of batch) if (!incoming.has(video.id)) { incoming.set(video.id, video); added++; }
+    if (!added) break;
+  }
+  return mergeNewVideos(existing, [...incoming.values()]);
+}
 function groupSeries(videos) {
   const groups = new Map();
   for (const video of videos) {
@@ -70,17 +100,22 @@ function groupSeries(videos) {
 function createShiaProvider(snapshot, options = {}) {
   const lists = { series: [...(snapshot.series || [])], movies: [...(snapshot.movies || [])] };
   let refreshed = 0, refreshJob;
+  let state = initialState;
   async function refresh() {
-    if (options.refresh !== true || Date.now() - refreshed < 600000) return;
-    if (!refreshJob) refreshJob = Promise.allSettled(['series', 'movies'].map(async channel => {
-      const page = await channelPage(channel);
-      const merged = new Map(page.videos.map(x => [x.id, x]));
-      for (const video of lists[channel]) if (!merged.has(video.id)) merged.set(video.id, video);
-      lists[channel] = [...merged.values()];
-    })).then(results => {
-      for (const r of results) if (r.status === 'rejected') console.error('ShiaTube refresh:', r.reason.message);
-      refreshed = Date.now(); refreshJob = undefined;
-    });
+    if (options.refresh === false || Date.now() - refreshed < 600000) return;
+    if (!refreshJob) refreshJob = (async () => {
+      try {
+        const result = await (options.readRemote || readRemoteContent)(state.revision);
+        if (result) {
+          Object.assign(savedSources, result.sources);
+          lists.series = result.snapshot.series;
+          lists.movies = result.snapshot.movies;
+          state = result.state;
+          mediaCache.clear();
+        }
+      } catch (error) { console.error('Content refresh kept the current index:', error.message); }
+      finally { refreshed = Date.now(); refreshJob = undefined; }
+    })();
     await refreshJob;
   }
   function groups() { return groupSeries(lists.series); }
@@ -110,19 +145,23 @@ function createShiaProvider(snapshot, options = {}) {
     if (!video) return [];
     const hint = savedSources[video.id];
     if (hint?.unavailable) return [];
+    if (!hint?.source && hint?.iframe) {
+      const frame = new URL(hint.iframe, BASE);
+      if (['www.dailymotion.com', 'dailymotion.com', 'www.youtube.com', 'youtube.com'].includes(frame.hostname)) return [{ name: 'ShiaTube', title: 'فتح المصدر الخارجي', externalUrl: frame.href }];
+    }
     let direct;
     if (hint?.source) {
       try { direct = canonicalMedia(hint.source).href; }
       catch {
         const url = new URL(hint.source, BASE);
-        if (!hint.iframe && ['youtube.com', 'www.youtube.com', 'youtu.be'].includes(url.hostname)) return [{ name: 'ShiaTube', title: 'YouTube — فتح المصدر', externalUrl: url.href }];
+        if (!hint.iframe && ['youtube.com', 'www.youtube.com', 'youtu.be', 'dailymotion.com', 'www.dailymotion.com'].includes(url.hostname)) return [{ name: 'ShiaTube', title: 'فتح المصدر الخارجي', externalUrl: url.href }];
         if (!hint.iframe) return [];
       }
     }
     const hls = direct?.includes('.m3u8') || false;
     return [{ name: 'ShiaTube', title: hls ? 'HLS — جودة تلقائية' : 'MP4 — تشغيل مباشر', url: direct || `/shiatube/play/${video.id}.mp4`, behaviorHints: { notWebReady: hls, bingeGroup: `shiatube-${hls ? 'hls' : 'mp4'}`, filename: `${video.id}.${hls ? 'm3u8' : 'mp4'}` } }];
   }
-  return { catalog, detail, streams, findVideo: id => [...lists.movies, ...lists.series].find(v => v.id === id) };
+  return { catalog, detail, streams, contentState: () => ({ revision: state.revision, updated: state.updated, series: lists.series.length, movies: lists.movies.length }), findVideo: id => [...lists.movies, ...lists.series].find(v => v.id === id) };
 }
 const mediaCache = new Map();
 function playbackError(code, message) {
@@ -192,6 +231,6 @@ function canonicalMedia(source) {
   return url;
 }
 function allowedMedia(url) {
-  return url.protocol === 'https:' && (url.hostname === 'shiatube.org' || url.hostname.endsWith('.b-cdn.net') || url.hostname.endsWith('.okcdn.ru') || url.hostname === 'preview.presstv.co.uk' || url.hostname.endsWith('.ifilmtv.ir'));
+  return url.protocol === 'https:' && (url.hostname === 'shiatube.org' || url.hostname.endsWith('.b-cdn.net') || url.hostname.endsWith('.okcdn.ru') || url.hostname === 'preview.presstv.co.uk' || url.hostname.endsWith('.ifilmtv.ir') || url.hostname.endsWith('.archive.org') || url.hostname === 'video.alkawthartv.ir');
 }
-module.exports = { parseVideos, groupSeries, createShiaProvider, syncChannel, resolveVideo, allowedMedia, normalize, UA, parsePlayer };
+module.exports = { parseVideos, groupSeries, createShiaProvider, syncChannel, syncRecentChannel, mergeNewVideos, resolveVideo, allowedMedia, normalize, UA, parsePlayer };
