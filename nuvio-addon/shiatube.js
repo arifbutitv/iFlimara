@@ -1,6 +1,7 @@
 'use strict';
 const cheerio = require('cheerio');
 const crypto = require('node:crypto');
+const savedSources = require('./data/shiatube-sources.json');
 const BASE = 'https://shiatube.org';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36';
 const HEADERS = { 'User-Agent': UA, Accept: 'text/html', 'Accept-Language': 'ar' };
@@ -70,7 +71,7 @@ function createShiaProvider(snapshot, options = {}) {
   const lists = { series: [...(snapshot.series || [])], movies: [...(snapshot.movies || [])] };
   let refreshed = 0, refreshJob;
   async function refresh() {
-    if (options.refresh === false || Date.now() - refreshed < 600000) return;
+    if (options.refresh !== true || Date.now() - refreshed < 600000) return;
     if (!refreshJob) refreshJob = Promise.allSettled(['series', 'movies'].map(async channel => {
       const page = await channelPage(channel);
       const merged = new Map(page.videos.map(x => [x.id, x]));
@@ -96,7 +97,7 @@ function createShiaProvider(snapshot, options = {}) {
       return video ? { meta: { id, type, name: video.title, poster: video.poster, background: video.poster, description: video.description, website: video.url, posterShape: 'landscape' } } : null;
     }
     const group = groups().find(g => id === `shiatube:series:${g.key}`);
-    return group ? { meta: { id, type, name: group.name, poster: group.poster, background: group.poster, description: group.description, posterShape: 'landscape', videos: group.episodes.map(v => ({ id: `${id}:1:${v.id}`, season: 1, episode: v.number, title: `الحلقة ${v.number}`, thumbnail: v.poster, available: true })) } } : null;
+    return group ? { meta: { id, type, name: group.name, poster: group.poster, background: group.poster, description: group.description, posterShape: 'landscape', videos: group.episodes.map(v => ({ id: `${id}:1:${v.id}`, season: 1, episode: v.number, title: `الحلقة ${v.number}`, thumbnail: v.poster, available: !savedSources[v.id]?.unavailable })) } } : null;
   }
   function videoFor(type, id) {
     if (type === 'movie') return lists.movies.find(v => id === `shiatube:movie:${v.id}`);
@@ -107,24 +108,62 @@ function createShiaProvider(snapshot, options = {}) {
   async function streams(type, id) {
     const video = videoFor(type, id);
     if (!video) return [];
-    return [{ name: 'ShiaTube', title: 'MP4 — تشغيل مباشر', url: `/shiatube/play/${video.id}.mp4`, behaviorHints: { notWebReady: false, bingeGroup: 'shiatube-mp4', filename: `${video.id}.mp4` } }];
+    const hint = savedSources[video.id];
+    if (hint?.unavailable) return [];
+    let direct;
+    if (hint?.source) {
+      try { direct = canonicalMedia(hint.source).href; }
+      catch {
+        const url = new URL(hint.source, BASE);
+        if (!hint.iframe && ['youtube.com', 'www.youtube.com', 'youtu.be'].includes(url.hostname)) return [{ name: 'ShiaTube', title: 'YouTube — فتح المصدر', externalUrl: url.href }];
+        if (!hint.iframe) return [];
+      }
+    }
+    const hls = direct?.includes('.m3u8') || false;
+    return [{ name: 'ShiaTube', title: hls ? 'HLS — جودة تلقائية' : 'MP4 — تشغيل مباشر', url: direct || `/shiatube/play/${video.id}.mp4`, behaviorHints: { notWebReady: hls, bingeGroup: `shiatube-${hls ? 'hls' : 'mp4'}`, filename: `${video.id}.${hls ? 'm3u8' : 'mp4'}` } }];
   }
   return { catalog, detail, streams, findVideo: id => [...lists.movies, ...lists.series].find(v => v.id === id) };
 }
 const mediaCache = new Map();
-async function resolveVideo(video) {
+function playbackError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+function parsePlayer(html) {
+  const $ = cheerio.load(html);
+  const scripted = /\$\(['"]video['"]\)\.attr\(['"]src['"]\s*,\s*['"]([^'"]+)['"]\)/.exec(html)?.[1];
+  return {
+    unavailable: $('.video-processing').length > 0,
+    source: $('video source[src]').first().attr('src') || $('video[src]').first().attr('src') || $('a[download]').first().attr('href') || scripted,
+    iframe: $('.pt_vdo_plyr iframe').first().attr('src') || $('iframe[src*="ok.ru/videoembed/"]').first().attr('src'),
+  };
+}
+async function resolveVideo(video, get = fetch) {
   if (new URL(video.url).origin !== BASE) throw new Error('Invalid watch destination');
   if (mediaCache.get(video.id)?.expires > Date.now()) return mediaCache.get(video.id).url;
-  const r = await fetch(video.url, { headers: HEADERS, signal: AbortSignal.timeout(20000) });
-  if (!r.ok) throw new Error(`ShiaTube watch HTTP ${r.status}`);
-  const $ = cheerio.load(await r.text());
-  let source = $('video source[src]').first().attr('src') || $('a[download]').first().attr('href');
+  let playerData = savedSources[video.id], lastError;
+  if (playerData?.unavailable) throw playbackError('SOURCE_UNAVAILABLE', 'Video is unavailable on ShiaTube');
+  for (const target of playerData ? [] : [video.url, `${BASE}/embed/${video.id}`]) {
+    try {
+      const r = await get(target, { headers: HEADERS, signal: AbortSignal.timeout(20000) });
+      if (!r.ok) throw playbackError(`SHIATUBE_HTTP_${r.status}`, `ShiaTube page HTTP ${r.status}`);
+      const parsed = parsePlayer(await r.text());
+      if (parsed.source || parsed.iframe) { playerData = parsed; break; }
+      throw playbackError('SHIATUBE_NO_PLAYER', 'ShiaTube page has no supported player');
+    } catch (error) { lastError = error; }
+  }
+  if (!playerData) throw lastError || playbackError('SHIATUBE_UNAVAILABLE', 'ShiaTube unavailable');
+  let source = playerData.source;
+  if (source && playerData.iframe) {
+    try { canonicalMedia(source); } catch { source = undefined; }
+  }
   if (!source) {
-    const iframe = $('.pt_vdo_plyr iframe').first().attr('src');
+    const iframe = playerData.iframe;
     const url = iframe && new URL(iframe, BASE);
     if (!url || !['ok.ru', 'www.ok.ru'].includes(url.hostname) || !/^\/videoembed\/\d+$/.test(url.pathname)) throw new Error('No supported public video source');
-    const embed = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(20000) });
-    if (!embed.ok) throw new Error(`Video player HTTP ${embed.status}`);
+    const embed = await get(url, { headers: HEADERS, signal: AbortSignal.timeout(20000) });
+    if (!embed.ok) throw playbackError(`OK_PLAYER_HTTP_${embed.status}`, `Video player HTTP ${embed.status}`);
     const player = cheerio.load(await embed.text());
     for (const el of player('[data-options]').toArray()) {
       const options = JSON.parse(player(el).attr('data-options'));
@@ -136,15 +175,23 @@ async function resolveVideo(video) {
     }
   }
   if (!source) throw new Error('No playable MP4 source');
-  let url = new URL(source, BASE);
-  if (url.hostname === 'preview.presstv.ir') url = new URL(url.pathname.replace(/^\/ifilm\//, ''), 'https://preview.presstv.co.uk/ifilm/');
-  if (!allowedMedia(url)) throw new Error('Unsupported media host');
+  const url = canonicalMedia(source);
   const value = url.href;
   if (mediaCache.size >= 200) mediaCache.delete(mediaCache.keys().next().value);
   mediaCache.set(video.id, { url: value, expires: Date.now() + 120000 });
   return value;
 }
+function canonicalMedia(source) {
+  let url = new URL(source, BASE);
+  if (url.hostname === 'preview.presstv.ir') url = new URL(url.pathname.replace(/^\/ifilm\//, ''), 'https://preview.presstv.co.uk/ifilm/');
+  if (url.hostname.endsWith('.ifilmtv.ir')) {
+    const path = url.pathname.replace(/^\/+/, '').replace(/^ifilm\//, '');
+    if (/^UploadedFiles\/Video\//i.test(path)) url = new URL(path, 'https://preview.presstv.co.uk/ifilm/');
+  }
+  if (!allowedMedia(url)) throw new Error('Unsupported media host');
+  return url;
+}
 function allowedMedia(url) {
   return url.protocol === 'https:' && (url.hostname === 'shiatube.org' || url.hostname.endsWith('.b-cdn.net') || url.hostname.endsWith('.okcdn.ru') || url.hostname === 'preview.presstv.co.uk' || url.hostname.endsWith('.ifilmtv.ir'));
 }
-module.exports = { parseVideos, groupSeries, createShiaProvider, syncChannel, resolveVideo, allowedMedia, normalize, UA };
+module.exports = { parseVideos, groupSeries, createShiaProvider, syncChannel, resolveVideo, allowedMedia, normalize, UA, parsePlayer };

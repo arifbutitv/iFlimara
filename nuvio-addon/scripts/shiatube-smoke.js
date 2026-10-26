@@ -1,4 +1,15 @@
 const assert = require('node:assert/strict');
+let blockedRequests = 0;
+if (process.env.BLOCK_SHIATUBE === '1') {
+  const originalFetch = global.fetch;
+  global.fetch = (target, options) => {
+    if (new URL(target).hostname === 'shiatube.org') {
+      blockedRequests++;
+      return Promise.resolve(new Response('Forbidden', { status: 403 }));
+    }
+    return originalFetch(target, options);
+  };
+}
 const app = require('../server');
 const server = app.listen(0, '127.0.0.1');
 server.once('listening', async () => {
@@ -23,6 +34,10 @@ server.once('listening', async () => {
       const search = await fetch(`${base}/catalog/${type}/shiatube-${type}/search=${encodeURIComponent(first.name)}.json`).then(r => r.json());
       assert.ok(search.metas.some(m => m.id === first.id));
       console.log(`${type}: search OK`);
+    }
+    if (process.env.BLOCK_SHIATUBE === '1') {
+      assert.equal(blockedRequests, 0, 'Playback must not request ShiaTube pages');
+      console.log('No ShiaTube page requests were needed with origin access blocked');
     }
   } catch (error) { console.error(error); process.exitCode = 1; }
   finally { server.closeAllConnections(); server.close(); }

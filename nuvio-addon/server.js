@@ -42,7 +42,11 @@ app.get(/^\/shiatube\/play\/([A-Za-z0-9]{10,40})\.mp4$/, async (req, res) => {
       await upstream.body?.cancel();
       url = new URL(upstream.headers.get('location'), url);
     }
-    if (!upstream.ok && upstream.status !== 416) throw new Error(`Media HTTP ${upstream.status}`);
+    if (!upstream.ok && upstream.status !== 416) {
+      const error = new Error(`Media HTTP ${upstream.status}`);
+      error.code = `MEDIA_HTTP_${upstream.status}`;
+      throw error;
+    }
     res.status(upstream.status);
     res.set('Cache-Control', 'no-store');
     for (const key of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
@@ -52,8 +56,9 @@ app.get(/^\/shiatube\/play\/([A-Za-z0-9]{10,40})\.mp4$/, async (req, res) => {
     Readable.fromWeb(upstream.body).on('error', () => res.destroy()).pipe(res);
   } catch (error) {
     if (!abort.signal.aborted) {
-      console.error('ShiaTube playback:', error.message);
-      if (!res.headersSent) res.status(502).json({ error: 'تعذر تشغيل فيديو ShiaTube' });
+      const code = /^([A-Z_]+)(_[0-9]+)?$/.test(error.code || '') ? error.code : error.name === 'TimeoutError' ? 'UPSTREAM_TIMEOUT' : 'UPSTREAM_CONNECTION_FAILED';
+      console.error('ShiaTube playback:', code, error.message);
+      if (!res.headersSent) res.status(502).json({ error: 'تعذر تشغيل فيديو ShiaTube', code });
       else res.destroy();
     }
   }
