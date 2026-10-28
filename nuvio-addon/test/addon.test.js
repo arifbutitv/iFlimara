@@ -85,7 +85,7 @@ test('HTTP manifest supports CORS, health and rejects unknown paths', async () =
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('access-control-allow-origin'), '*');
     const manifest = await response.json();
-    assert.equal(manifest.catalogs.length, 4);
+    assert.equal(manifest.catalogs.length, 6);
     assert.equal(manifest.name, 'آي فيلم العربية');
     assert.ok(manifest.catalogs.every(x => x.extra.some(e => e.name === 'search')));
     assert.equal((await fetch(`${origin}/health`).then(r => r.json())).status, 'ok');
