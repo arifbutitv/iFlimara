@@ -51,9 +51,14 @@ function createScheduleProvider(live, get = request, now = Date.now) {
     try { return await pending; } finally { pending = undefined; }
   }
   function valid(type, id) { return type === 'tv' && /^ifilmar-schedule:\d{4}-\d{2}-\d{2}:\d{4}:\d+$/.test(id); }
-  function meta(item, all) {
+  function endTime(item, all) {
     const next = all.find(x => x.start > item.start);
-    const state = now() < item.start ? 'قادم' : next ? (now() < next.start ? 'يعرض الآن' : 'موعد سابق') : 'بدأ موعده';
+    // Without a next slot, stop carrying the final entry at the end of its
+    // published Mecca day rather than showing an old programme indefinitely.
+    return next?.start ?? Date.parse(`${item.date}T00:00:00+03:00`) + 86400000;
+  }
+  function meta(item, all) {
+    const state = now() < item.start ? 'قادم' : now() < endTime(item, all) ? 'يعرض الآن' : 'موعد سابق';
     const { title, start, time, day, date, ...m } = item;
     return { ...m, description: `${state}\n${m.description}`, releaseInfo: `${day} ${date} • ${time} (UTC+3)` };
   }
@@ -61,7 +66,12 @@ function createScheduleProvider(live, get = request, now = Date.now) {
     async catalog(type, extra = {}) {
       if (type !== 'tv') return [];
       const all = await load(), search = normalize(extra.search), skip = Math.max(0, Number(extra.skip) || 0);
-      return all.filter(x => !search || normalize(`${x.title} ${x.day} ${x.date} ${x.time}`).includes(search)).slice(skip, skip + 100).map(x => meta(x, all));
+      const current = now();
+      // Filter before search and pagination, on every request, even while the
+      // upstream schedule is cached. Keep the on-air slot and future slots.
+      return all.filter(x => endTime(x, all) > current)
+        .filter(x => !search || normalize(`${x.title} ${x.day} ${x.date} ${x.time}`).includes(search))
+        .slice(skip, skip + 100).map(x => meta(x, all));
     },
     async detail(type, id) {
       if (!valid(type, id)) return null;

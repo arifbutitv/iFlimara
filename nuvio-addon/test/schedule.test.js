@@ -44,3 +44,34 @@ test('Schedule catalog routes independently while TV Live remains first', async 
   assert.equal((await addon.get('meta', 'tv', 'ifilmar-schedule:2026-10-29:0000:1')).meta.name, 'برنامج');
   assert.equal((await addon.get('stream', 'tv', 'ifilmar-schedule:2026-10-29:0000:1')).streams[0].url, 'live');
 });
+test('Schedule hides finished slots from browsing and search as time advances inside the cache period', async () => {
+  let now = Date.parse('2026-10-28T21:59:00Z'), requests = 0;
+  const p = createScheduleProvider({}, async path => {
+    requests++;
+    return path === '/Schedule/PersionWeek' ? [day] : rows;
+  }, () => now);
+  assert.equal((await p.catalog('tv'))[0].id, 'ifilmar-schedule:2026-10-29:0000:1');
+  now += 60000;
+  const current = await p.catalog('tv');
+  assert.equal(current.length, 1);
+  assert.equal(current[0].id, 'ifilmar-schedule:2026-10-29:0100:2');
+  assert.match(current[0].description, /^يعرض الآن/);
+  assert.deepEqual(await p.catalog('tv', { search: 'أربع شقق' }), []);
+  assert.deepEqual(await p.catalog('tv', { skip: 1 }), []);
+  assert.equal(requests, 2);
+  now = Date.parse('2026-10-29T21:00:00Z');
+  assert.deepEqual(await p.catalog('tv'), []);
+});
+test('Schedule keeps the current slot across Mecca midnight until the next published slot', async () => {
+  const nextDay = { strDate: '2026-10-30 00:00:00', NameDayOfWeek: 'الجمعة' };
+  const p = createScheduleProvider({}, async path => {
+    if (path === '/Schedule/PersionWeek') return [day, nextDay];
+    return new URL(path, 'https://example.org').searchParams.get('strDate') === day.strDate
+      ? [{ ItemId: 10, Title: 'قبل منتصف الليل', Time: '23:30' }]
+      : [{ ItemId: 11, Title: 'بعد منتصف الليل', Time: '00:30' }];
+  }, () => Date.parse('2026-10-29T21:10:00Z'));
+  const items = await p.catalog('tv');
+  assert.equal(items.length, 2);
+  assert.match(items[0].description, /^يعرض الآن/);
+  assert.match(items[1].description, /^قادم/);
+});
