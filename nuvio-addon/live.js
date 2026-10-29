@@ -2,9 +2,13 @@
 const cheerio = require('cheerio');
 const crypto = require('node:crypto');
 const channels = [
-  { key: 'ifilm', name: 'iFilm', arabic: 'آي فيلم العربية', website: 'https://ar.ifilmtv.ir/Home/Live', poster: 'https://ar.ifilmtv.ir/img/final-logo01.png' },
-  { key: 'kawthar', name: 'Al-Kawthar', arabic: 'الكوثر', website: 'https://www.alkawthartv.ir/live', poster: 'https://lb-cdn.sepehrtv.ir/img/channel/logo/alkowsar.png' },
-  { key: 'almaaref', name: 'Al-Maaref', arabic: 'المعارف', website: 'https://almaaref.ch/البث-المباشر-6/', poster: 'https://almaaref.ch/wp-content/uploads/elementor/thumbs/Almaaref-Logo-white-qfl1sieramw1phb614lea7dmzi7lg9sd1zkc08ecqo.png' },
+  { key: 'ifilm', name: 'آي فيلم', arabic: 'آي فيلم العربية', website: 'https://ar.ifilmtv.ir/Home/Live', poster: 'https://ar.ifilmtv.ir/img/final-logo01.png' },
+  { key: 'kawthar', name: 'الكوثر', arabic: 'الكوثر', website: 'https://www.alkawthartv.ir/live', poster: 'https://lb-cdn.sepehrtv.ir/img/channel/logo/alkowsar.png' },
+  { key: 'almaaref', name: 'المعارف', arabic: 'المعارف', website: 'https://almaaref.ch/البث-المباشر-6/', poster: 'https://almaaref.ch/wp-content/uploads/elementor/thumbs/Almaaref-Logo-white-qfl1sieramw1phb614lea7dmzi7lg9sd1zkc08ecqo.png' },
+  { key: 'aliman', name: 'الإيمان', arabic: 'الإيمان', website: 'https://cpweb.ettehadlive.com/tv/?id=22260' },
+  { key: 'alnaeem', name: 'النعيم', arabic: 'النعيم', website: 'https://cpweb.ettehadlive.com/tv/?id=9' },
+  { key: 'aljawadain', name: 'الجوادين', arabic: 'الجوادين', website: 'https://cpweb.ettehadlive.com/tv/?id=22296' },
+  { key: 'alghadeer', name: 'الغدير', arabic: 'الغدير', website: 'https://cpweb.ettehadlive.com/tv/?id=6' },
 ];
 const FRAME = 'https://sepehrtv.ir/frame/t/alkosar?logo=0';
 const API = 'https://sepehrapi.sepehrtv.ir/beta/v0/channels/get?key=alkosar&include_media_resources=true&include_details=true';
@@ -19,7 +23,7 @@ function oauthHeader(url, client, nonce = crypto.randomBytes(16).toString('hex')
 function allowedStream(value) {
   try {
     const u = new URL(value);
-    return u.protocol === 'https:' && !u.username && !u.password && !u.port && /\.m3u8$/i.test(u.pathname) && (u.hostname === 'live.presstv.co.uk' || u.hostname === 'sepehrtv.ir' || u.hostname.endsWith('.sepehrtv.ir') || u.hostname.endsWith('.zeuscdn724.com'));
+    return u.protocol === 'https:' && !u.username && !u.password && !u.port && /\.m3u8$/i.test(u.pathname) && (u.hostname === 'live.presstv.co.uk' || u.hostname === 'sepehrtv.ir' || u.hostname.endsWith('.sepehrtv.ir') || u.hostname.endsWith('.zeuscdn724.com') || u.hostname === 'svs.itworkscdn.net' || u.hostname === 's1.ettehadlive.com' || u.hostname === 'live.aljawadain.org');
   } catch { return false; }
 }
 function hlsSources(html) {
@@ -36,7 +40,7 @@ function hlsSources(html) {
 }
 async function request(url, headers = {}) {
   const u = new URL(url);
-  if (u.protocol !== 'https:' || (!allowedStream(url) && !['ar.ifilmtv.ir', 'www.alkawthartv.ir', 'almaaref.ch', 'sepehrtv.ir', 'sepehrapi.sepehrtv.ir'].includes(u.hostname))) throw new Error('Invalid live upstream');
+  if (u.protocol !== 'https:' || (!allowedStream(url) && !['ar.ifilmtv.ir', 'www.alkawthartv.ir', 'almaaref.ch', 'sepehrtv.ir', 'sepehrapi.sepehrtv.ir', 'cpweb.ettehadlive.com'].includes(u.hostname))) throw new Error('Invalid live upstream');
   const r = await fetch(u, { headers: { 'User-Agent': 'Mozilla/5.0', ...headers }, signal: AbortSignal.timeout(15000) });
   if (!r.ok) { const e = new Error(`Live upstream HTTP ${r.status}`); e.status = r.status; throw e; }
   return r.text();
@@ -68,7 +72,7 @@ function createLiveProvider(get = request) {
     try { return await clientLoading; } finally { clientLoading = undefined; }
   }
   function channel(type, id) { return type === 'tv' ? channels.find(c => id === `ifilmar-live:${c.key}`) : undefined; }
-  function meta(c) { return { id: `ifilmar-live:${c.key}`, type: 'tv', name: c.name, description: `${c.arabic} — البث المباشر`, poster: c.poster, logo: c.poster, posterShape: 'square', genres: ['TV Live'], language: 'العربية', website: c.website }; }
+  function meta(c) { return { id: `ifilmar-live:${c.key}`, type: 'tv', name: c.name, description: `${c.arabic} — البث المباشر`, poster: `/assets/live/${c.key}.png`, logo: `/assets/live/${c.key}.png`, posterShape: 'square', genres: ['TV Live'], language: 'العربية', website: c.website }; }
   async function resolve(c) {
     if (c.key !== 'kawthar') {
       const sources = hlsSources(await get(c.website));
@@ -100,7 +104,7 @@ function createLiveProvider(get = request) {
       if (type !== 'tv') return [];
       const search = String(extra.search || '').trim().toLowerCase();
       const skip = Math.max(0, Number(extra.skip) || 0);
-      return channels.filter(c => `${c.name} ${c.arabic}`.toLowerCase().includes(search)).slice(skip, skip + 100).map(meta);
+      return channels.filter(c => `${c.name} ${c.arabic} ${{ifilm:'iFilm',kawthar:'Al-Kawthar',almaaref:'Al-Maaref'}[c.key] || ''}`.toLowerCase().includes(search)).slice(skip, skip + 100).map(meta);
     },
     async detail(type, id) { const c = channel(type, id); return c ? { meta: meta(c) } : null; },
     async streams(type, id) {

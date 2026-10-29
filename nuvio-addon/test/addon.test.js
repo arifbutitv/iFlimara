@@ -88,10 +88,19 @@ test('HTTP manifest supports CORS, health and rejects unknown paths', async () =
     assert.equal(manifest.catalogs.length, 7);
     assert.equal(manifest.catalogs[0].name, 'TV Live');
     const live = await fetch(`${origin}/catalog/tv/ifilmar-live.json`).then(r => r.json());
-    assert.deepEqual(live.metas.map(x => x.name), ['iFilm', 'Al-Kawthar', 'Al-Maaref']);
+    assert.deepEqual(live.metas.map(x => x.name), ['آي فيلم', 'الكوثر', 'المعارف', 'الإيمان', 'النعيم', 'الجوادين', 'الغدير']);
     const liveMeta = await fetch(`${origin}/meta/tv/ifilmar-live:almaaref.json`).then(r => r.json());
-    assert.equal(liveMeta.meta.name, 'Al-Maaref');
-    assert.equal(manifest.name, 'آي فيلم العربية');
+    assert.equal(liveMeta.meta.name, 'المعارف');
+    for (const item of live.metas) {
+      assert.match(item.poster, new RegExp(`^${origin}/assets/live/`));
+      const artwork = await fetch(item.poster);
+      assert.equal(artwork.status, 200);
+      assert.match(artwork.headers.get('content-type'), /image\/png/);
+      const png = Buffer.from(await artwork.arrayBuffer());
+      assert.equal(png.readUInt32BE(16), 512);
+      assert.equal(png.readUInt32BE(20), 512);
+    }
+    assert.equal(manifest.name, 'ArifButi VIP');
     assert.ok(manifest.catalogs.every(x => x.extra.some(e => e.name === 'search')));
     assert.equal((await fetch(`${origin}/health`).then(r => r.json())).status, 'ok');
     assert.equal((await fetch(`${origin}/not-an-endpoint`)).status, 404);

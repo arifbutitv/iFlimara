@@ -1,15 +1,33 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createLiveProvider, hlsSources, allowedStream, oauthHeader } = require('../live');
-test('TV Live lists exactly the three requested channels and supports Arabic search', async () => {
+test('TV Live lists the seven requested Arabic channels and supports Arabic search', async () => {
   const p = createLiveProvider(() => { throw new Error('Catalog must not fetch'); });
-  assert.deepEqual((await p.catalog('tv')).map(x => x.name), ['iFilm', 'Al-Kawthar', 'Al-Maaref']);
+  assert.deepEqual((await p.catalog('tv')).map(x => x.name), ['آي فيلم', 'الكوثر', 'المعارف', 'الإيمان', 'النعيم', 'الجوادين', 'الغدير']);
   assert.equal((await p.catalog('tv', { search: 'المعارف' }))[0].id, 'ifilmar-live:almaaref');
   assert.equal((await p.catalog('tv', { search: 'iFilm' })).length, 1);
   assert.deepEqual(await p.catalog('tv', { skip: 100 }), []);
   assert.deepEqual(await p.streams('movie', 'ifilmar-live:ifilm'), []);
   assert.deepEqual(await p.streams('tv', 'ifilmar-live:unknown'), []);
   assert.equal(await p.detail('tv', 'ifilmar-live:unknown'), null);
+});
+test('Ettehad channels resolve only their official HLS sources and deduplicate qualities', async () => {
+  const sources = {
+    aliman: ['22260', 'https://svs.itworkscdn.net/alimanlive/imantv.smil/alimanpublish/imantv/chunks.m3u8'],
+    alnaeem: ['9', 'https://s1.ettehadlive.com/live/22/playlist.m3u8'],
+    aljawadain: ['22296', 'https://live.aljawadain.org/live/aljawadaintv/playlist.m3u8'],
+    alghadeer: ['6', 'https://s1.ettehadlive.com/live/2/playlist.m3u8'],
+  };
+  const p = createLiveProvider(async u => {
+    const entry = Object.values(sources).find(x => new URL(u).searchParams.get('id') === x[0]);
+    assert.ok(entry);
+    return `<video><source src="${entry[1]}"><source src="${entry[1]}"><source src="https://evil.example/live.m3u8"></video>`;
+  });
+  for (const [key, [, url]] of Object.entries(sources)) {
+    const streams = await p.streams('tv', `ifilmar-live:${key}`);
+    assert.equal(streams.length, 1);
+    assert.equal(streams[0].url, url);
+  }
 });
 test('Live parser reads source tags and HTML-encoded WordPress player JSON safely', () => {
   assert.deepEqual(hlsSources('<video srcjsplayer="https://live.presstv.co.uk/hls/ifilmar.m3u8"><source src="https://live.presstv.co.uk/hls/ifilmar.m3u8"></video>'), ['https://live.presstv.co.uk/hls/ifilmar.m3u8']);

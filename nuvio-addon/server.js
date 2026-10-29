@@ -6,6 +6,7 @@ const { Readable } = require('node:stream');
 const app = express();
 const addon = createAddon();
 app.disable('x-powered-by');
+app.use('/assets', express.static(require('node:path').join(__dirname, 'assets'), { maxAge: '1d', setHeaders: res => res.setHeader('Access-Control-Allow-Origin', '*') }));
 app.use((req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
@@ -15,7 +16,7 @@ app.use((req, res, next) => {
   if (req.url.length > 3000) return res.status(414).json({ error: 'Request too long' });
   next();
 });
-app.get('/', (_req, res) => res.type('html').send('<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>آي فيلم — Nuvio</title><body style="font:20px system-ui;max-width:700px;margin:60px auto;padding:24px"><h1>آي فيلم العربية</h1><p>إضافة Nuvio للأفلام والمسلسلات والبحث.</p><p>انسخ رابط <a href="manifest.json">manifest.json</a> من هذا الخادم والصقه في Nuvio ← الإعدادات ← الإضافات ← إضافة Addon.</p><p>المحتوى المتاح يعتمد على الموقع الرسمي؛ بعض الأفلام تحتوي إعلاناً فقط.</p></body></html>'));
+app.get('/', (_req, res) => res.type('html').send('<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ArifButi VIP — Nuvio</title><body style="font:20px system-ui;max-width:700px;margin:60px auto;padding:24px"><h1>ArifButi VIP</h1><p>إضافة Nuvio للأفلام والمسلسلات والبحث.</p><p>انسخ رابط <a href="manifest.json">manifest.json</a> من هذا الخادم والصقه في Nuvio ← الإعدادات ← الإضافات ← إضافة Addon.</p><p>المحتوى المتاح يعتمد على الموقع الرسمي؛ بعض الأفلام تحتوي إعلاناً فقط.</p></body></html>'));
 app.get('/health', (_req, res) => res.json({ status: 'ok', content: addon.shia.contentState() }));
 // OK.ru signs media URLs for the resolver's IP. Forward only known indexed
 // videos, with Range support; never accept a user-supplied remote URL.
@@ -74,6 +75,12 @@ app.get(/^\/(catalog|meta|stream)\/(movie|series|tv)\/([^/]+?)(?:\/([^/]+))?\.js
     // Relative stream addresses become the actual deployment's HTTPS origin.
     const host = req.get('host');
     const scheme = req.get('x-forwarded-proto')?.split(',')[0] === 'https' || req.secure ? 'https' : 'http';
+    const absoluteArtwork = item => {
+      for (const key of ['poster', 'logo', 'background']) if (item[key]?.startsWith('/assets/')) item[key] = `${scheme}://${host}${item[key]}`;
+      return item;
+    };
+    if (result.metas) result.metas = result.metas.map(absoluteArtwork);
+    if (result.meta) result.meta = absoluteArtwork(result.meta);
     if (result.streams) result.streams = result.streams.map(stream => ({ ...stream, url: stream.url?.startsWith('/') ? `${scheme}://${host}${stream.url}` : stream.url }));
     res.set('Cache-Control', `public, max-age=${result.cacheMaxAge || 60}`);
     res.json(result);

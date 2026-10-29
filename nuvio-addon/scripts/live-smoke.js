@@ -14,7 +14,7 @@ server.once('listening', async () => {
     const manifest = await fetch(`${base}/manifest.json`).then(r => r.json());
     assert.equal(manifest.catalogs[0].name, 'TV Live');
     const catalog = await fetch(`${base}/catalog/tv/ifilmar-live.json`).then(r => r.json());
-    assert.deepEqual(catalog.metas.map(x => x.name), ['iFilm', 'Al-Kawthar', 'Al-Maaref']);
+    assert.deepEqual(catalog.metas.map(x => x.name), ['آي فيلم', 'الكوثر', 'المعارف', 'الإيمان', 'النعيم', 'الجوادين', 'الغدير']);
     for (const item of catalog.metas) {
       const meta = await fetch(`${base}/meta/tv/${item.id}.json`).then(r => r.json());
       assert.equal(meta.meta.name, item.name);

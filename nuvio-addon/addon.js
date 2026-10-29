@@ -4,7 +4,7 @@ const { createShiaProvider } = require('./shiatube');
 const { createKawtharProvider } = require('./kawthar');
 const { createLiveProvider } = require('./live');
 const manifest = {
-  id: 'community.arifbutitv.ifilmar', version: '1.4.0', name: 'آي فيلم العربية',
+  id: 'community.arifbutitv.ifilmar', version: '1.5.0', name: 'ArifButi VIP',
   description: 'TV Live وقوائم الأفلام والمسلسلات من آي فيلم وShiaTube والكوثر، مع البحث والحلقات ومصادر التشغيل.',
   resources: ['catalog', { name: 'meta', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'] }, { name: 'stream', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'] }],
   types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'],
