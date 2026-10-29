@@ -117,6 +117,6 @@ function createKawtharProvider(get = request) {
     if (!m[3] || !page.episodes.some(e => e.key === m[3])) return [];
     return playable(parsePage(await cached(`episode:${m[3]}`, () => get(`/episode/${m[3]}`)), type, m[3]));
   }
-  return { catalog, detail, streams };
+  return { catalog, detail, streams, playable };
 }
 module.exports = { createKawtharProvider, parseCards, parsePage, mediaUrl, normalize };
