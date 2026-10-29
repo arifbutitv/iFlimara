@@ -85,7 +85,8 @@ test('HTTP manifest supports CORS, health and rejects unknown paths', async () =
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('access-control-allow-origin'), '*');
     const manifest = await response.json();
-    assert.equal(manifest.catalogs.length, 7);
+    assert.equal(manifest.catalogs.length, 8);
+    assert.equal(manifest.catalogs[1].name, 'جدول البث iFilm');
     assert.equal(manifest.catalogs[0].name, 'TV Live');
     const live = await fetch(`${origin}/catalog/tv/ifilmar-live.json`).then(r => r.json());
     assert.deepEqual(live.metas.map(x => x.name), ['آي فيلم', 'الكوثر', 'المعارف', 'الإيمان', 'النعيم', 'الجوادين', 'الغدير']);

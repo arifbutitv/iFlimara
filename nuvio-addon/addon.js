@@ -3,8 +3,9 @@ const { createProvider } = require('./provider');
 const { createShiaProvider } = require('./shiatube');
 const { createKawtharProvider } = require('./kawthar');
 const { createLiveProvider } = require('./live');
+const { createScheduleProvider } = require('./schedule');
 const manifest = {
-  id: 'community.arifbutitv.ifilmar', version: '1.5.0', name: 'ArifButi VIP',
+  id: 'community.arifbutitv.ifilmar', version: '1.6.0', name: 'ArifButi VIP',
   description: 'TV Live وقوائم الأفلام والمسلسلات من آي فيلم وShiaTube والكوثر، مع البحث والحلقات ومصادر التشغيل.',
   resources: ['catalog', { name: 'meta', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'] }, { name: 'stream', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'] }],
   types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'],
@@ -14,13 +15,21 @@ const manifest = {
 // Keep the live catalog first in the manifest so clients show it first.
 manifest.types.unshift('tv');
 manifest.idPrefixes.push('ifilmar-live:');
+manifest.idPrefixes.push('ifilmar-schedule:');
 for (const resource of manifest.resources) if (typeof resource === 'object') {
   resource.types.push('tv'); resource.idPrefixes.push('ifilmar-live:');
+  resource.idPrefixes.push('ifilmar-schedule:');
 }
 manifest.catalogs.unshift({ type: 'tv', id: 'ifilmar-live', name: 'TV Live', extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }] });
-function createAddon(provider = createProvider(), shia = createShiaProvider(require('./data/shiatube.json')), kawthar = createKawtharProvider(), live = createLiveProvider()) {
+manifest.catalogs.splice(1, 0, { type: 'tv', id: 'ifilmar-schedule', name: 'جدول البث iFilm', extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }] });
+function createAddon(provider = createProvider(), shia = createShiaProvider(require('./data/shiatube.json')), kawthar = createKawtharProvider(), live = createLiveProvider(), schedule = createScheduleProvider(live)) {
   return { manifest, async get(resource, type, id, extra = {}) {
     if (type === 'tv') {
+      if (resource === 'catalog' && id === 'ifilmar-schedule') return { metas: await schedule.catalog(type, extra), cacheMaxAge: 60 };
+      if (id.startsWith('ifilmar-schedule:')) {
+        if (resource === 'meta') return { meta: (await schedule.detail(type, id))?.meta || null, cacheMaxAge: 60 };
+        if (resource === 'stream') return { streams: await schedule.streams(type, id), cacheMaxAge: 15 };
+      }
       if (resource === 'catalog') return { metas: id === 'ifilmar-live' ? await live.catalog(type, extra) : [], cacheMaxAge: 120 };
       if (resource === 'meta') return { meta: (await live.detail(type, id))?.meta || null, cacheMaxAge: 120 };
       if (resource === 'stream') return { streams: await live.streams(type, id), cacheMaxAge: 15 };
