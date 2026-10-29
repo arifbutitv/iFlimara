@@ -6,7 +6,8 @@ const { createLiveProvider } = require('./live');
 const { createScheduleProvider } = require('./schedule');
 const { createProgramsProvider } = require('./programs');
 const manifest = {
-  id: 'community.arifbutitv.ifilmar', version: '1.7.0', name: 'ArifButi VIP',
+  logo: '/assets/arifbuti-vip.png',
+  id: 'community.arifbutitv.ifilmar', version: '1.7.1', name: 'ArifButi VIP',
   description: 'TV Live وقوائم الأفلام والمسلسلات من آي فيلم وShiaTube والكوثر، مع البحث والحلقات ومصادر التشغيل.',
   resources: ['catalog', { name: 'meta', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'] }, { name: 'stream', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'] }],
   types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'],
