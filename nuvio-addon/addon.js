@@ -2,16 +2,29 @@
 const { createProvider } = require('./provider');
 const { createShiaProvider } = require('./shiatube');
 const { createKawtharProvider } = require('./kawthar');
+const { createLiveProvider } = require('./live');
 const manifest = {
-  id: 'community.arifbutitv.ifilmar', version: '1.3.0', name: 'آي فيلم العربية',
-  description: 'ست قوائم للأفلام والمسلسلات من آي فيلم وShiaTube والكوثر، مع البحث والحلقات ومصادر التشغيل.',
+  id: 'community.arifbutitv.ifilmar', version: '1.4.0', name: 'آي فيلم العربية',
+  description: 'TV Live وقوائم الأفلام والمسلسلات من آي فيلم وShiaTube والكوثر، مع البحث والحلقات ومصادر التشغيل.',
   resources: ['catalog', { name: 'meta', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'] }, { name: 'stream', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'] }],
   types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'],
   catalogs: ['ifilmar', 'shiatube', 'kawthar'].flatMap(source => ['series', 'movie'].map(type => ({ type, id: `${source}-${type}`, name: `${({ ifilmar: 'آي فيلم', shiatube: 'ShiaTube', kawthar: 'الكوثر' })[source]} — ${type === 'series' ? 'المسلسلات' : 'الأفلام'}`, extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }] }))),
   behaviorHints: { adult: false, p2p: false, configurable: false },
 };
-function createAddon(provider = createProvider(), shia = createShiaProvider(require('./data/shiatube.json')), kawthar = createKawtharProvider()) {
+// Keep the live catalog first in the manifest so clients show it first.
+manifest.types.unshift('tv');
+manifest.idPrefixes.push('ifilmar-live:');
+for (const resource of manifest.resources) if (typeof resource === 'object') {
+  resource.types.push('tv'); resource.idPrefixes.push('ifilmar-live:');
+}
+manifest.catalogs.unshift({ type: 'tv', id: 'ifilmar-live', name: 'TV Live', extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }] });
+function createAddon(provider = createProvider(), shia = createShiaProvider(require('./data/shiatube.json')), kawthar = createKawtharProvider(), live = createLiveProvider()) {
   return { manifest, async get(resource, type, id, extra = {}) {
+    if (type === 'tv') {
+      if (resource === 'catalog') return { metas: id === 'ifilmar-live' ? await live.catalog(type, extra) : [], cacheMaxAge: 120 };
+      if (resource === 'meta') return { meta: (await live.detail(type, id))?.meta || null, cacheMaxAge: 120 };
+      if (resource === 'stream') return { streams: await live.streams(type, id), cacheMaxAge: 15 };
+    }
     if (resource === 'catalog') return { metas: id === `ifilmar-${type}` ? await provider.catalog(type, extra) : id === `shiatube-${type}` ? await shia.catalog(type, extra) : id === `kawthar-${type}` ? await kawthar.catalog(type, extra) : [], cacheMaxAge: 120 };
     const selected = id.startsWith('kawthar:') ? kawthar : id.startsWith('shiatube:') ? shia : provider;
     if (resource === 'meta') return { meta: (await selected.detail(type, id))?.meta || null, cacheMaxAge: 120 };

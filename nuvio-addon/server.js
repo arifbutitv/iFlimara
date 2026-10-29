@@ -64,7 +64,7 @@ app.get(/^\/shiatube\/play\/([A-Za-z0-9]{10,40})\.mp4$/, async (req, res) => {
   }
 });
 app.get('/manifest.json', (_req, res) => res.json(addon.manifest));
-app.get(/^\/(catalog|meta|stream)\/(movie|series)\/([^/]+?)(?:\/([^/]+))?\.json$/, async (req, res) => {
+app.get(/^\/(catalog|meta|stream)\/(movie|series|tv)\/([^/]+?)(?:\/([^/]+))?\.json$/, async (req, res) => {
   const resource = req.params[0], type = req.params[1], id = req.params[2];
   try {
     // Read raw extras to preserve escaped '&' and '/' inside search queries.
