@@ -89,8 +89,9 @@ test('HTTP manifest supports CORS, health and rejects unknown paths', async () =
     const logo = await fetch(manifest.logo);
     assert.equal(logo.status, 200);
     assert.match(logo.headers.get('content-type'), /image\/png/);
-    assert.equal(manifest.catalogs.length, 10);
-    assert.deepEqual(manifest.catalogs.map(c => c.id), ['ifilmar-live', 'ifilmar-schedule', 'ifilmar-series', 'ifilmar-movie', 'ifilmar-programs', 'kawthar-series', 'kawthar-movie', 'kawthar-programs', 'shiatube-series', 'shiatube-movie']);
+    assert.equal(manifest.catalogs.length, 11);
+    assert.deepEqual(manifest.catalogs.map(c => c.id), ['ifilmar-live', 'ifilmar-schedule', 'ifilmar-series', 'ifilmar-movie', 'ifilmar-programs', 'kawthar-series', 'kawthar-movie', 'kawthar-programs', 'noradrama-playlists', 'shiatube-series', 'shiatube-movie']);
+    assert.equal(manifest.catalogs[8].name, 'يوتيوب نورا دراما');
     for (const source of ['ifilmar', 'kawthar']) assert.equal(manifest.catalogs.findIndex(c => c.id === `${source}-programs`), manifest.catalogs.findIndex(c => c.id === `${source}-movie`) + 1);
     assert.equal(manifest.catalogs[1].name, 'جدول البث iFilm');
     assert.equal(manifest.catalogs[0].name, 'TV Live');

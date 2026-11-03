@@ -5,9 +5,10 @@ const { createKawtharProvider } = require('./kawthar');
 const { createLiveProvider } = require('./live');
 const { createScheduleProvider } = require('./schedule');
 const { createProgramsProvider } = require('./programs');
+const { createYouTubeProvider } = require('./youtube');
 const manifest = {
   logo: '/assets/arifbuti-vip.png',
-  id: 'community.arifbutitv.ifilmar', version: '1.7.1', name: 'ArifButi VIP',
+  id: 'community.arifbutitv.ifilmar', version: '1.8.0', name: 'ArifButi VIP',
   description: 'TV Live وقوائم الأفلام والمسلسلات من آي فيلم وShiaTube والكوثر، مع البحث والحلقات ومصادر التشغيل.',
   resources: ['catalog', { name: 'meta', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'] }, { name: 'stream', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'] }],
   types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'],
@@ -29,10 +30,18 @@ for (const [source, name] of [['ifilmar', 'آي فيلم'], ['kawthar', 'الك�
   manifest.idPrefixes.push(`${source}-program:`);
   for (const resource of manifest.resources) if (typeof resource === 'object') resource.idPrefixes.push(`${source}-program:`);
 }
-const catalogOrder = ['ifilmar-live', 'ifilmar-schedule', 'ifilmar-series', 'ifilmar-movie', 'ifilmar-programs', 'kawthar-series', 'kawthar-movie', 'kawthar-programs', 'shiatube-series', 'shiatube-movie'];
+manifest.catalogs.push({ type: 'series', id: 'noradrama-playlists', name: 'يوتيوب نورا دراما', extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }] });
+manifest.idPrefixes.push('noradrama:');
+for (const resource of manifest.resources) if (typeof resource === 'object') resource.idPrefixes.push('noradrama:');
+const catalogOrder = ['ifilmar-live', 'ifilmar-schedule', 'ifilmar-series', 'ifilmar-movie', 'ifilmar-programs', 'kawthar-series', 'kawthar-movie', 'kawthar-programs', 'noradrama-playlists', 'shiatube-series', 'shiatube-movie'];
 manifest.catalogs.sort((a, b) => catalogOrder.indexOf(a.id) - catalogOrder.indexOf(b.id));
-function createAddon(provider = createProvider(), shia = createShiaProvider(require('./data/shiatube.json')), kawthar = createKawtharProvider(), live = createLiveProvider(), schedule = createScheduleProvider(live), ifilmPrograms = createProgramsProvider('ifilm'), kawtharPrograms = createProgramsProvider('kawthar')) {
+function createAddon(provider = createProvider(), shia = createShiaProvider(require('./data/shiatube.json')), kawthar = createKawtharProvider(), live = createLiveProvider(), schedule = createScheduleProvider(live), ifilmPrograms = createProgramsProvider('ifilm'), kawtharPrograms = createProgramsProvider('kawthar'), youtube = createYouTubeProvider()) {
   return { manifest, async get(resource, type, id, extra = {}) {
+    if ((resource === 'catalog' && id === 'noradrama-playlists') || id.startsWith('noradrama:')) {
+      if (resource === 'catalog') return { metas: await youtube.catalog(type, extra), cacheMaxAge: 120 };
+      if (resource === 'meta') return { meta: (await youtube.detail(type, id))?.meta || null, cacheMaxAge: 120 };
+      if (resource === 'stream') return { streams: await youtube.streams(type, id), cacheMaxAge: 120 };
+    }
     const programs = resource === 'catalog' ? (id === 'ifilmar-programs' ? ifilmPrograms : id === 'kawthar-programs' ? kawtharPrograms : null) : (id.startsWith('ifilmar-program:') ? ifilmPrograms : id.startsWith('kawthar-program:') ? kawtharPrograms : null);
     if (programs) {
       if (resource === 'catalog') return { metas: await programs.catalog(type, extra), cacheMaxAge: 120 };
