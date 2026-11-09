@@ -97,6 +97,12 @@ function groupSeries(videos) {
   for (const group of groups.values()) group.episodes.sort((a, b) => a.number - b.number);
   return [...groups.values()];
 }
+function watchUrl(video) {
+  try {
+    const url = new URL(video?.url);
+    if (url.origin === BASE && !url.username && !url.password && url.pathname.startsWith('/watch/')) return url.href;
+  } catch {}
+}
 function createShiaProvider(snapshot, options = {}) {
   const lists = { series: [...(snapshot.series || [])], movies: [...(snapshot.movies || [])] };
   let refreshed = 0, refreshJob;
@@ -132,7 +138,7 @@ function createShiaProvider(snapshot, options = {}) {
       return video ? { meta: { id, type, name: video.title, poster: video.poster, background: video.poster, description: video.description, website: video.url, posterShape: 'landscape' } } : null;
     }
     const group = groups().find(g => id === `shiatube:series:${g.key}`);
-    return group ? { meta: { id, type, name: group.name, poster: group.poster, background: group.poster, description: group.description, posterShape: 'landscape', videos: group.episodes.map(v => ({ id: `${id}:1:${v.id}`, season: 1, episode: v.number, title: `الحلقة ${v.number}`, thumbnail: v.poster, available: !savedSources[v.id]?.unavailable })) } } : null;
+    return group ? { meta: { id, type, name: group.name, poster: group.poster, background: group.poster, description: group.description, posterShape: 'landscape', videos: group.episodes.map(v => ({ id: `${id}:1:${v.id}`, season: 1, episode: v.number, title: `الحلقة ${v.number}`, thumbnail: v.poster, available: Boolean(watchUrl(v)) })) } } : null;
   }
   function videoFor(type, id) {
     if (type === 'movie') return lists.movies.find(v => id === `shiatube:movie:${v.id}`);
@@ -141,27 +147,10 @@ function createShiaProvider(snapshot, options = {}) {
     return group?.episodes.find(v => v.id === match[2]);
   }
   async function streams(type, id) {
-    const video = videoFor(type, id);
-    if (!video) return [];
-    const hint = savedSources[video.id];
-    if (hint?.unavailable) return [];
-    if (!hint?.source && hint?.iframe) {
-      const frame = new URL(hint.iframe, BASE);
-      if (['www.dailymotion.com', 'dailymotion.com', 'www.youtube.com', 'youtube.com'].includes(frame.hostname)) return [{ name: 'ShiaTube', title: 'فتح المصدر الخارجي', externalUrl: frame.href }];
-    }
-    let direct;
-    if (hint?.source) {
-      try { direct = canonicalMedia(hint.source).href; }
-      catch {
-        const url = new URL(hint.source, BASE);
-        if (!hint.iframe && ['youtube.com', 'www.youtube.com', 'youtu.be', 'dailymotion.com', 'www.dailymotion.com'].includes(url.hostname)) return [{ name: 'ShiaTube', title: 'فتح المصدر الخارجي', externalUrl: url.href }];
-        if (!hint.iframe) return [];
-      }
-    }
-    const hls = direct?.includes('.m3u8') || false;
-    return [{ name: 'ShiaTube', title: hls ? 'HLS — جودة تلقائية' : 'MP4 — تشغيل مباشر', url: direct || `/shiatube/play/${video.id}.mp4`, behaviorHints: { notWebReady: hls, bingeGroup: `shiatube-${hls ? 'hls' : 'mp4'}`, filename: `${video.id}.${hls ? 'm3u8' : 'mp4'}` } }];
+    const externalUrl = watchUrl(videoFor(type, id));
+    return externalUrl ? [{ name: 'ShiaTube', title: 'فتح في ShiaTube', externalUrl }] : [];
   }
-  return { catalog, detail, streams, contentState: () => ({ revision: state.revision, updated: state.updated, series: lists.series.length, movies: lists.movies.length }), findVideo: id => [...lists.movies, ...lists.series].find(v => v.id === id) };
+  return { catalog, detail, streams, contentState: () => ({ revision: state.revision, updated: state.updated, series: lists.series.length, movies: lists.movies.length }), findWatchUrl: id => watchUrl(lists.movies.find(v => v.id === id) || lists.series.find(v => v.id === id)) };
 }
 const mediaCache = new Map();
 function playbackError(code, message) {

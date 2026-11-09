@@ -1,8 +1,6 @@
 'use strict';
 const express = require('express');
 const { createAddon } = require('./addon');
-const { resolveVideo, allowedMedia, UA } = require('./shiatube');
-const { Readable } = require('node:stream');
 const app = express();
 const addon = createAddon();
 app.disable('x-powered-by');
@@ -18,51 +16,11 @@ app.use((req, res, next) => {
 });
 app.get('/', (_req, res) => res.type('html').send('<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ArifButi VIP — Nuvio</title><body style="font:20px system-ui;max-width:700px;margin:60px auto;padding:24px"><h1>ArifButi VIP</h1><p>إضافة Nuvio للأفلام والمسلسلات والبحث.</p><p>انسخ رابط <a href="manifest.json">manifest.json</a> من هذا الخادم والصقه في Nuvio ← الإعدادات ← الإضافات ← إضافة Addon.</p><p>المحتوى المتاح يعتمد على الموقع الرسمي؛ بعض الأفلام تحتوي إعلاناً فقط.</p></body></html>'));
 app.get('/health', (_req, res) => res.json({ status: 'ok', content: addon.shia.contentState() }));
-// OK.ru signs media URLs for the resolver's IP. Forward only known indexed
-// videos, with Range support; never accept a user-supplied remote URL.
-app.get(/^\/shiatube\/play\/([A-Za-z0-9]{10,40})\.mp4$/, async (req, res) => {
-  const video = addon.shia.findVideo(req.params[0]);
-  if (!video) return res.sendStatus(404);
-  const abort = new AbortController();
-  res.on('close', () => abort.abort());
-  try {
-    let url = new URL(await resolveVideo(video));
-    if (!url.hostname.endsWith('.okcdn.ru')) return res.redirect(307, url.href);
-    const headers = { 'User-Agent': UA, Referer: url.hostname.endsWith('.okcdn.ru') ? 'https://ok.ru/' : 'https://shiatube.org/' };
-    if (req.headers.range) {
-      if (!/^bytes=\d*-\d*$/.test(req.headers.range)) return res.sendStatus(416);
-      headers.Range = req.headers.range;
-    }
-    let upstream;
-    for (let redirects = 0; redirects < 5; redirects++) {
-      if (!allowedMedia(url)) throw new Error('Invalid media destination');
-      const timeout = setTimeout(() => abort.abort(), 30000);
-      try { upstream = await fetch(url, { headers, redirect: 'manual', signal: abort.signal }); }
-      finally { clearTimeout(timeout); }
-      if (![301, 302, 303, 307, 308].includes(upstream.status)) break;
-      await upstream.body?.cancel();
-      url = new URL(upstream.headers.get('location'), url);
-    }
-    if (!upstream.ok && upstream.status !== 416) {
-      const error = new Error(`Media HTTP ${upstream.status}`);
-      error.code = `MEDIA_HTTP_${upstream.status}`;
-      throw error;
-    }
-    res.status(upstream.status);
-    res.set('Cache-Control', 'no-store');
-    for (const key of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
-      if (upstream.headers.has(key)) res.set(key, upstream.headers.get(key));
-    }
-    if (req.method === 'HEAD') { await upstream.body?.cancel(); return res.end(); }
-    Readable.fromWeb(upstream.body).on('error', () => res.destroy()).pipe(res);
-  } catch (error) {
-    if (!abort.signal.aborted) {
-      const code = /^([A-Z_]+)(_[0-9]+)?$/.test(error.code || '') ? error.code : error.name === 'TimeoutError' ? 'UPSTREAM_TIMEOUT' : 'UPSTREAM_CONNECTION_FAILED';
-      console.error('ShiaTube playback:', code, error.message);
-      if (!res.headersSent) res.status(502).json({ error: 'تعذر تشغيل فيديو ShiaTube', code });
-      else res.destroy();
-    }
-  }
+// Send previously cached playback links to the original watch page.
+app.get(/^\/shiatube\/play\/([A-Za-z0-9]{10,40})\.mp4$/, (req, res) => {
+  const url = addon.shia.findWatchUrl(req.params[0]);
+  if (!url) return res.sendStatus(404);
+  return res.set("Cache-Control", "no-store").redirect(302, url);
 });
 app.get('/manifest.json', (req, res) => {
   const scheme = req.get('x-forwarded-proto')?.split(',')[0] === 'https' || req.secure ? 'https' : 'http';

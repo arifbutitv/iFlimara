@@ -36,7 +36,7 @@ test('a new episode appears in the running service without a Render redeploy', a
   const meta = provider.detail('series', catalog[0].id).meta;
   assert.equal(meta.videos[0].episode, 3);
   const streams = await provider.streams('series', meta.videos[0].id);
-  assert.equal(streams[0].url, sources[video.id].source);
+  assert.equal(streams[0].externalUrl, video.url);
   await provider.catalog('series');
   assert.equal(calls, 1);
 });

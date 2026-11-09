@@ -33,10 +33,11 @@ test('ShiaTube metadata and streams reference only indexed videos', async () => 
   const detail = provider.detail('series', series.id);
   assert.equal(detail.meta.videos[0].episode, 1);
   const stream = await provider.streams('series', detail.meta.videos[0].id);
-  assert.equal(stream[0].url, '/shiatube/play/fixtureEpisode001.mp4');
+  assert.equal(stream[0].externalUrl, videos[1].url);
+  assert.equal(stream[0].url, undefined);
   assert.deepEqual(await provider.streams('series', `${series.id}:1:unknown`), []);
-  assert.equal(provider.findVideo(movie.id).url, movie.url);
-  assert.equal(provider.findVideo('unknown'), undefined);
+  assert.equal(provider.findWatchUrl(movie.id), movie.url);
+  assert.equal(provider.findWatchUrl('unknown'), undefined);
 });
 test('media proxy destinations require HTTPS on known media hosts', () => {
   assert.equal(allowedMedia(new URL('https://vd434.okcdn.ru/video')), true);
@@ -91,12 +92,12 @@ test('videos under review are detected as unavailable', () => {
   assert.equal(parsePlayer('<div class="video-processing">هذا الفيديو قيد المراجعة</div>').unavailable, true);
 });
 
-test('the reported episode returns its direct media URL rather than the blocked resolver', async () => {
+test('the reported episode opens its original ShiaTube watch page', async () => {
   const data = require('../data/shiatube.json');
   const group = groupSeries(data.series).find(g => g.episodes.some(v => v.id === 'kNisp9IJaMyCs01'));
   const provider = createShiaProvider(data);
   const streams = await provider.streams('series', `shiatube:series:${group.key}:1:kNisp9IJaMyCs01`);
-  assert.equal(streams[0].url, 'https://preview.presstv.co.uk/ifilm/ar59417/1.mp4');
+  assert.equal(streams[0].externalUrl, group.episodes.find(v => v.id === 'kNisp9IJaMyCs01').url);
 });
 
 test('every indexed video has a saved source or an explicit unavailable state', () => {
