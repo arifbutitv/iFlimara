@@ -26,6 +26,13 @@ app.get('/manifest.json', (req, res) => {
   const scheme = req.get('x-forwarded-proto')?.split(',')[0] === 'https' || req.secure ? 'https' : 'http';
   res.json({ ...addon.manifest, logo: new URL(addon.manifest.logo, `${scheme}://${req.get('host')}`).href });
 });
+// Android browsers need a user click to launch a package-specific intent.
+app.get(/^\/open\/tizentube\/([A-Za-z0-9_-]{11})\/([A-Za-z0-9_-]{10,80})$/, (req, res) => {
+  const [video, playlist] = [req.params[0], req.params[1]];
+  const watch = `www.youtube.com/watch?v=${video}&amp;list=${playlist}`;
+  const intent = `intent://${watch}#Intent;scheme=https;package=io.gh.reisxd.tizentube.cobalt;end`;
+  res.type('html').send(`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>فتح في TizenTubeCobalt</title><style>body{font:24px system-ui;background:#151320;color:#fff;padding:2rem}a{display:block;width:fit-content;margin:1rem 0;padding:.75rem 1rem;border-radius:.5rem;background:#eee;color:#151320}a:focus{outline:4px solid #be94ff}</style><h1>مشاهدة الفيديو</h1><a href="${intent}" autofocus>فتح في TizenTubeCobalt</a><a href="https://${watch}">فتح في YouTube</a></html>`);
+});
 app.get(/^\/(catalog|meta|stream)\/(movie|series|tv)\/([^/]+?)(?:\/([^/]+))?\.json$/, async (req, res) => {
   const resource = req.params[0], type = req.params[1], id = req.params[2];
   try {
@@ -42,7 +49,13 @@ app.get(/^\/(catalog|meta|stream)\/(movie|series|tv)\/([^/]+?)(?:\/([^/]+))?\.js
     };
     if (result.metas) result.metas = result.metas.map(absoluteArtwork);
     if (result.meta) result.meta = absoluteArtwork(result.meta);
-    if (result.streams) result.streams = result.streams.map(stream => ({ ...stream, url: stream.url?.startsWith('/') ? `${scheme}://${host}${stream.url}` : stream.url }));
+    if (result.streams) result.streams = result.streams.map(stream => {
+      const output = { ...stream };
+      for (const key of ['url', 'externalUrl']) {
+        if (output[key]?.startsWith('/')) output[key] = `${scheme}://${host}${output[key]}`;
+      }
+      return output;
+    });
     res.set('Cache-Control', `public, max-age=${result.cacheMaxAge || 60}`);
     res.json(result);
   } catch (error) {

@@ -40,6 +40,7 @@ test('YouTube combines both channels, paginates videos, refreshes new content an
   assert.equal(page.meta.videos.length, 2);
   const streams = await p.streams('series', page.meta.videos[0].id);
   assert.equal(streams[0].externalUrl, `https://www.youtube.com/watch?v=aaaaaaaaaaa&list=${playlistA}`);
+  assert.equal(streams[1].externalUrl, `/open/tizentube/aaaaaaaaaaa/${playlistA}`);
   assert.equal(streams[0].url, undefined);
   assert.deepEqual(await p.streams('series', `noradrama:${playlistA}:1:zzzzzzzzzzz`), []);
   const before = reads;

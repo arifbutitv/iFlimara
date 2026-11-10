@@ -129,7 +129,10 @@ function createYouTubeProvider(read = request, now = Date.now) {
       const m = parse(type, id); if (!m || !m[2]) return [];
       const page = await detail(type, PREFIX + m[1]);
       if (!page?.items.some(x => x.key === m[2])) return [];
-      return [{ name: 'YouTube', title: 'فتح في YouTube', externalUrl: `https://www.youtube.com/watch?v=${m[2]}&list=${m[1]}` }];
+      return [
+        { name: 'YouTube', title: 'فتح في YouTube', externalUrl: `https://www.youtube.com/watch?v=${m[2]}&list=${m[1]}` },
+        { name: 'TizenTubeCobalt', title: 'فتح في TizenTubeCobalt', externalUrl: `/open/tizentube/${m[2]}/${m[1]}` },
+      ];
     },
   };
 }
