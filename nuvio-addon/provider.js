@@ -38,7 +38,11 @@ function parseDetail(html, id) {
   const meta = key => $(`meta[property="${key}"]`).attr('content')?.trim();
   const title = meta('og:title') || $('h1').first().text().trim();
   if (!title) throw new Error('Upstream page is missing its title');
-  const item = { id, type: parsed.type, name: title, poster: absolute(meta('og:image')), background: absolute(meta('og:image')), posterShape: 'landscape', description: meta('og:description'), language: 'العربية', website: `${BASE}/${routes[parsed.type]}/Content/${parsed.number}` };
+  const isDescription = text => Boolean(text && !/^System\.Nullable\s*`?\s*1\s*\[/i.test(text));
+  const summary = meta('og:description');
+  const bodySummary = $('.Film-info-panel .Fulltext_panel p').map((_, p) => $(p).text().trim()).get().filter(isDescription).join('\n\n');
+  const description = isDescription(summary) ? summary : bodySummary || undefined;
+  const item = { id, type: parsed.type, name: title, poster: absolute(meta('og:image')), background: absolute(meta('og:image')), posterShape: 'landscape', description, language: 'العربية', website: `${BASE}/${routes[parsed.type]}/Content/${parsed.number}` };
   const year = title.match(/\b(19\d{2}|20\d{2})\b/);
   if (year) item.releaseInfo = year[1];
   const external = /var\s+extrafild\s*=\s*"([^"]*)"/.exec(html)?.[1];

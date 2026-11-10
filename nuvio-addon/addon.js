@@ -8,7 +8,7 @@ const { createProgramsProvider } = require('./programs');
 const { createYouTubeProvider } = require('./youtube');
 const manifest = {
   logo: '/assets/arifbuti-vip.png',
-  id: 'community.arifbutitv.ifilmar', version: '1.8.2', name: 'ArifButi VIP',
+  id: 'community.arifbutitv.ifilmar', version: '1.8.3', name: 'ArifButi VIP',
   description: 'TV Live وقوائم الأفلام والمسلسلات من آي فيلم وShiaTube والكوثر، مع البحث والحلقات ومصادر التشغيل.',
   resources: ['catalog', { name: 'meta', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'] }, { name: 'stream', types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'] }],
   types: ['movie', 'series'], idPrefixes: ['ifilmar:', 'shiatube:', 'kawthar:'],

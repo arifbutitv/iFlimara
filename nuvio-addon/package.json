@@ -1,6 +1,6 @@
 {
   "name": "ifilm-nuvio-addon",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "private": true,
   "description": "Arabic iFilm catalog, search, metadata and streams for Nuvio/Stremio",
   "engines": {

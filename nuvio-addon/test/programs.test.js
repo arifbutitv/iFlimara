@@ -14,11 +14,15 @@ test('iFilm programs catalog searches and paginates independently from series an
 });
 test('iFilm programs use Program pages, stable episode IDs and original media resolution', async () => {
   const p = createProgramsProvider('ifilm', async (path, json) => {
-    if (!json) { assert.equal(path, '/Program/Content/1'); return '<meta property="og:title" content="كواليس">'; }
+    if (!json) {
+      assert.equal(path, '/Program/Content/1');
+      return '<meta property="og:title" content="كواليس"><meta property="og:description" content="System.Nullable`1[System.Int32][]"><div class="Film-info-panel"><div class="Fulltext_panel"><p>برنامج عن كواليس التصوير.</p></div></div>';
+    }
     return path.includes('page=1&') ? [{ Episode: 1, VideoAddress: '/UploadedFiles/Video/test.mp4' }] : [];
   });
   const page = await p.detail('series', 'ifilmar-program:1');
   assert.equal(page.meta.website, 'https://ar.ifilmtv.ir/Program/Content/1');
+  assert.equal(page.meta.description, 'برنامج عن كواليس التصوير.');
   assert.equal(page.meta.videos[0].id, 'ifilmar-program:1:1:1');
   assert.match((await p.streams('series', page.meta.videos[0].id))[0].url, /preview.presstv.co.uk\/ifilm\/UploadedFiles\/Video\/test.mp4/);
 });
