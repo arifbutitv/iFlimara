@@ -1,0 +1,6 @@
+{
+  "name": "iFlimara | آي فيلم العربية",
+  "description": "أفلام ومسلسلات موقع آي فيلم العربي الرسمي",
+  "manifestVersion": 1,
+  "pluginLists": ["https://raw.githubusercontent.com/arifbutitv/iFlimara/builds/plugins.json"]
+}
