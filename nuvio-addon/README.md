@@ -13,6 +13,7 @@
 | الكوثر — الأفلام | [أفلام الكوثر](https://www.alkawthartv.ir/category/628) |
 | الكوثر — البرامج | [برامج الكوثر](https://www.alkawthartv.ir/programs) |
 | يوتيوب نورا دراما | [NoraDrama](https://www.youtube.com/@NoraDrama/playlists) و[ISHRAQ Production](https://www.youtube.com/@ISHRAQ_Production/playlists) |
+| Dailymotion | [قوائم ifilm.tvchannel](https://www.dailymotion.com/user/ifilm.tvchannel/playlists)، مع البحث والحلقات المرتبة وخيار فتح في Dailymotion |
 | ShiaTube — المسلسلات | [قناة المسلسلات](https://shiatube.org/@series) |
 | ShiaTube — الأفلام | [قناة الأفلام](https://shiatube.org/@movies) |
 
