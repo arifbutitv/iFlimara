@@ -15,7 +15,7 @@ app.use((req, res, next) => {
   next();
 });
 app.get('/', (_req, res) => res.type('html').send('<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ArifButi VIP — Nuvio</title><body style="font:20px system-ui;max-width:700px;margin:60px auto;padding:24px"><h1>ArifButi VIP</h1><p>إضافة Nuvio للأفلام والمسلسلات والبحث.</p><p>انسخ رابط <a href="manifest.json">manifest.json</a> من هذا الخادم والصقه في Nuvio ← الإعدادات ← الإضافات ← إضافة Addon.</p><p>المحتوى المتاح يعتمد على الموقع الرسمي؛ بعض الأفلام تحتوي إعلاناً فقط.</p></body></html>'));
-app.get('/health', (_req, res) => res.json({ status: 'ok', content: addon.shia.contentState() }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', content: addon.shia.contentState(), recent: addon.recent.status() }));
 // Send previously cached playback links to the original watch page.
 app.get(/^\/shiatube\/play\/([A-Za-z0-9]{10,40})\.mp4$/, (req, res) => {
   const url = addon.shia.findWatchUrl(req.params[0]);
@@ -33,7 +33,7 @@ app.get(/^\/open\/tizentube\/([A-Za-z0-9_-]{11})\/([A-Za-z0-9_-]{10,80})$/, (req
   const intent = `intent://${watch}#Intent;scheme=https;package=io.gh.reisxd.tizentube.cobalt;end`;
   res.type('html').send(`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>فتح في TizenTubeCobalt</title><style>body{font:24px system-ui;background:#151320;color:#fff;padding:2rem}a{display:block;width:fit-content;margin:1rem 0;padding:.75rem 1rem;border-radius:.5rem;background:#eee;color:#151320}a:focus{outline:4px solid #be94ff}</style><h1>مشاهدة الفيديو</h1><a href="${intent}" autofocus>فتح في TizenTubeCobalt</a><a href="https://${watch}">فتح في YouTube</a></html>`);
 });
-app.get(/^\/(catalog|meta|stream)\/(movie|series|tv)\/([^/]+?)(?:\/([^/]+))?\.json$/, async (req, res) => {
+app.get(/^\/(catalog|meta|stream)\/(movie|series|tv|other)\/([^/]+?)(?:\/([^/]+))?\.json$/, async (req, res) => {
   const resource = req.params[0], type = req.params[1], id = req.params[2];
   try {
     // Read raw extras to preserve escaped '&' and '/' inside search queries.
@@ -59,9 +59,14 @@ app.get(/^\/(catalog|meta|stream)\/(movie|series|tv)\/([^/]+?)(?:\/([^/]+))?\.js
     res.set('Cache-Control', `public, max-age=${result.cacheMaxAge || 60}`);
     res.json(result);
   } catch (error) {
+    if (error.code === 'RECENT_NOT_READY') return res.status(503).json({ error: 'فهرس المضاف حديثاً قيد التحميل، حاول مجددًا قريبًا' });
+    if (error.code === 'RECENT_REVISION_EXPIRED') return res.status(409).json({ error: 'انتهت نسخة التصفح، أعد تحميل القائمة من البداية', code: error.code });
     console.error('iFilm request failed:', error.message);
     res.status(502).json({ error: 'تعذر الاتصال بموقع آي فيلم، حاول مرة أخرى' });
   }
 });
-if (require.main === module) app.listen(process.env.PORT || 7000, '0.0.0.0', () => console.log(`iFilm addon listening on ${process.env.PORT || 7000}`));
+if (require.main === module) {
+  addon.recent.start();
+  app.listen(process.env.PORT || 7000, '0.0.0.0', () => console.log(`iFilm addon listening on ${process.env.PORT || 7000}`));
+}
 module.exports = app;

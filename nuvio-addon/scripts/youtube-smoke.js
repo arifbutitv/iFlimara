@@ -6,7 +6,7 @@ server.once('listening', async () => {
   async function get(path) { const r = await fetch(base + path, { signal: AbortSignal.timeout(90000) }); assert.equal(r.status, 200, path); return r.json(); }
   try {
     const manifest = await get('/manifest.json');
-    assert.equal(manifest.catalogs[8].name, 'يوتيوب نورا دراما');
+    assert.equal(manifest.catalogs.find(c => c.id === 'noradrama-playlists').name, 'يوتيوب نورا دراما');
     const catalog = await get('/catalog/series/noradrama-playlists.json');
     assert.ok(catalog.metas.length);
     for (const channel of ['نورا دراما', 'إشراق']) {

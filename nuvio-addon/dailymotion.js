@@ -44,7 +44,7 @@ function createDailymotionProvider(read = request, now = Date.now) {
     }
     throw new Error('Dailymotion pagination limit');
   }
-  const index = () => cached('catalog', () => pages('/user/ifilm.tvchannel/playlists', 'id,name,description,thumbnail_url'));
+  const index = () => cached('catalog', () => pages('/user/ifilm.tvchannel/playlists', 'id,name,description,thumbnail_url,created_time'));
   function meta(item) {
     return { id: PREFIX + item.id, type: 'series', name: item.name, description: item.description || undefined, poster: item.thumbnail_url, posterShape: 'landscape', website: `https://www.dailymotion.com/playlist/${item.id}`, language: 'العربية' };
   }
@@ -62,6 +62,13 @@ function createDailymotionProvider(read = request, now = Date.now) {
     return { meta: { ...meta(item), videos: numbered.map((video, i) => ({ id: `${id}:1:${video.id}`, title: video.title, season: 1, episode: video.number || i + 1, thumbnail: video.thumbnail_url })) }, videos };
   }
   return {
+    async recentCatalog(extra = {}) {
+      const skip = Math.max(0, Math.trunc(Number(extra.skip) || 0));
+      return (await index()).slice(skip, skip + 100).map(item => ({
+        meta: meta(item),
+        sourceAddedAt: Number.isFinite(item.created_time) && item.created_time > 0 ? new Date(item.created_time * 1000).toISOString() : undefined,
+      }));
+    },
     async catalog(type, extra = {}) {
       if (type !== 'series') return [];
       const search = normalize(extra.search || '');

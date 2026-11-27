@@ -1,0 +1,44 @@
+name: Update central recent catalog
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: central-recent-index
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: code
+      - uses: actions/checkout@v4
+        with:
+          ref: content-index
+          path: state
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: code/nuvio-addon/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: code/nuvio-addon
+      - name: Observe catalogs independently of Render traffic
+        env:
+          RECENT_INDEX_FILE: ${{ github.workspace }}/state/recent.json
+        run: node code/nuvio-addon/scripts/update-recent.js
+      - name: Publish atomic durable snapshot
+        if: always()
+        working-directory: state
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add recent.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update central recent catalog'
+            git push origin HEAD:content-index
+          fi
