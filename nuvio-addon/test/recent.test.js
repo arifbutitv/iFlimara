@@ -80,6 +80,8 @@ test('Recent pagination pins a durable revision across additions and renames wit
   assert.deepEqual([...first.metas, ...second.metas, ...third.metas].map(x => x.id).sort(), originalIds);
   assert.equal(queryPage(index).metas[0].id, 'ifilmar:movie:999');
   assert.equal(queryPage(index, { revision: 1, search: 'برنامج 0' }).metas.length, 1);
+  for (let i = 0; i < 12; i++) await updateIndex(index, [], { now: () => Date.parse(T1) });
+  assert.throws(() => queryPage(index, { revision: 1 }), { code: 'RECENT_REVISION_EXPIRED' });
 });
 
 test('Recent ledger and pinned page order survive reopening a durable file and overlapping writers are rejected', async () => {
@@ -140,4 +142,27 @@ test('ShiaTube original episode aliases keep firstSeenAt when a group title and 
   assert.equal(Object.keys(index.records).length, 1);
   assert.equal(queryIndex(index)[0].firstSeenAt, T0);
   assert.equal(queryIndex(index)[0].id, 'shiatube:series:newhash');
+});
+
+test('Recent worker refuses to silently recreate a missing durable ledger', () => {
+  const { spawnSync } = require('node:child_process');
+  const file = path.join(os.tmpdir(), `missing-recent-${process.pid}-${Date.now()}`, 'recent.json');
+  const child = spawnSync(process.execPath, [path.join(__dirname, '../scripts/update-recent.js')], {
+    encoding: 'utf8', windowsHide: true,
+    env: { ...process.env, RECENT_INDEX_FILE: file, RECENT_BOOTSTRAP: '0' },
+  });
+  assert.equal(child.status, 1);
+  assert.match(child.stderr, /Refusing to reset firstSeenAt/);
+  assert.equal(fs.existsSync(file), false);
+});
+
+test('Recent observation bounds concurrent source fetches', async () => {
+  let active = 0, maximum = 0;
+  const sources = Array.from({ length: 5 }, (_, i) => ({ key: `source${i}`, page: async () => {
+    active++; maximum = Math.max(maximum, active);
+    await new Promise(resolve => setImmediate(resolve));
+    active--; return [item(i + 1)];
+  } }));
+  await updateIndex(emptyIndex(), sources, { now: () => Date.parse(T0), concurrency: 2 });
+  assert.equal(maximum, 2);
 });

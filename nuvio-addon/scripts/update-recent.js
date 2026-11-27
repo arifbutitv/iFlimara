@@ -1,5 +1,6 @@
 'use strict';
 const path = require('node:path');
+const fs = require('node:fs');
 const { createAddon } = require('../addon');
 const { createShiaProvider } = require('../shiatube');
 const { createDailymotionProvider } = require('../dailymotion');
@@ -9,6 +10,7 @@ const { readIndex, writeIndex, withIndexLock, updateIndex } = require('../recent
 async function main() {
   const file = process.env.RECENT_INDEX_FILE;
   if (!file || !path.isAbsolute(file)) throw new Error('Set RECENT_INDEX_FILE to an absolute path in the durable state checkout');
+  if (!fs.existsSync(file) && process.env.RECENT_BOOTSTRAP !== '1') throw new Error('Durable recent ledger missing. Refusing to reset firstSeenAt. Restore the published ledger or explicitly set RECENT_BOOTSTRAP=1 for a first initialization');
   await withIndexLock(file, async () => {
     const snapshot = require('../data/shiatube.json');
     const shia = createShiaProvider(snapshot, { refresh: false });
